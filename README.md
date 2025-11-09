@@ -280,11 +280,6 @@ docker ps # Check container health status
 ### Logs
 docker-compose logs -f app
 
-## Testing
-pip install pytest pytest-asyncio httpx
-Run tests
-pytest tests/
-
 
 ## Trade-offs
 
