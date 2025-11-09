@@ -5,30 +5,34 @@ A production-ready, high-performance URL shortener service built with FastAPI, P
 ## Features
 
 ✅ Shorten long URLs with unique codes (max 10 characters)
+
 ✅ Idempotent URL creation (same URL returns same code)
+
 ✅ Sub-10ms redirect performance with Redis caching
+
 ✅ Rate limiting (100 requests/minute per IP)
+
 ✅ Click tracking and analytics
+
 ✅ Custom alias support
+
 ✅ Admin dashboard with authentication
+
 ✅ Pagination for URL listing
+
 ✅ Docker containerization with Alpine Linux
+
 ✅ Multi-stage Docker builds for minimal image size
+
 ✅ 5-year URL retention
+
 ✅ Graceful shutdown and error handling
+
 
 ## Architecture
 
-┌─────────────┐     ┌─────────────┐     ┌──────────────┐
-│ Client      │────▶│ FastAPI     │────▶│ PostgreSQL   │
-└─────────────┘     │ (Alpine)    │     └──────────────┘
-                    └─────────────┘              │
-                            │                    │
-                            ▼                    │
-                    ┌─────────────┐              │
-                    │ Redis       │◀─────────────┘
-                    │ (Cache)     │
-                    └─────────────┘
+<img width="976" height="400" alt="Screenshot 2025-11-09 at 9 12 19 PM" src="https://github.com/user-attachments/assets/2074e83b-5289-4376-93a5-a010d34c3df5" />
+
 
 ### Tech Stack
 
@@ -60,68 +64,158 @@ The service will be available at `http://localhost:8080`
 
 ## API Documentation
 
+> [!NOTE]
+> Can also use http://localhost:8080/docs for Swagger-UI documention
+
 ### Base URL
 http://localhost:8080
 
-### Endpoints
+## API Endpoints
 
-#### 1. Create Short URL
-curl -X POST http://localhost:8080/api/shorten
--H "Content-Type: application/json"
--d '{"target_url": "https://www.example.com/very/long/url"}'
+### 1. Create Short URL
+
+**Endpoint:** `POST /api/shorten`
+
+```
+curl -X POST "http://localhost:8080/api/shorten?target_url=https://www.example.com/very/long/url" \
+  -H "Content-Type: application/json"
+```
 
 **Response:**
+```
 {
-"short_code": "abc123",
-"short_url": "http://localhost:8080/abc123",
-"original_url": "https://www.example.com/very/long/url",
-"created_at": "2025-11-08T18:30:00Z"
+  "short_code": "abc123",
+  "short_url": "http://localhost:8080/abc123",
+  "original_url": "https://www.example.com/very/long/url",
+  "created_at": "2025-11-08T18:30:00Z"
 }
+```
 
-#### 2. Create Short URL with Custom Alias
-curl -X POST http://localhost:8080/api/shorten
--H "Content-Type: application/json"
--d '{"target_url": "https://example.com", "custom_alias": "mylink"}'
+---
 
-#### 3. Redirect to Original URL
+### 2. Create Short URL with Custom Alias
+
+**Endpoint:** `POST /api/shorten`
+
+```
+curl -X POST "http://localhost:8080/api/shorten?custom_alias=my_link&target_url=https://www.example.com/very/long/url" \
+  -H "Content-Type: application/json"
+```
+
+**Response:**
+```
+{
+  "short_code": "my_link",
+  "short_url": "http://localhost:8080/my_link",
+  "original_url": "https://www.example.com/very/long/url",
+  "created_at": "2025-11-08T18:30:00Z"
+}
+```
+
+---
+
+### 3. Redirect to Original URL
+
+**Endpoint:** `GET /{short_code}`
+
+```
 curl -L http://localhost:8080/abc123
+```
 
-Redirects to original URL with 301 status
+> [!NOTE]
+> Returns a `301` redirect to the original URL.
 
-#### 4. Get URL Info
+---
+
+### 4. Get URL Info
+
+**Endpoint:** `GET /api/info/{short_code}`
+
+```
 curl http://localhost:8080/api/info/abc123
+```
 
 **Response:**
+```
 {
-"short_code": "abc123",
-"short_url": "http://localhost:8080/abc123",
-"original_url": "https://www.example.com/very/long/url",
-"click_count": 42,
-"last_accessed_at": "2025-11-08T18:35:00Z",
-"created_at": "2025-11-08T18:30:00Z",
-"is_active": true
+  "short_code": "abc123",
+  "short_url": "http://localhost:8080/abc123",
+  "original_url": "https://www.example.com/very/long/url",
+  "click_count": 42,
+  "last_accessed_at": "2025-11-08T18:35:00Z",
+  "created_at": "2025-11-08T18:30:00Z",
+  "is_active": true
 }
-#### 5. List All URLs (Admin)
+```
 
-curl http://localhost:8080/api/admin/urls?page=1&page_size=20
--H "Authorization: Bearer your_admin_token"
+---
 
-#### 6. Get Analytics (Admin)
+### 5. List All URLs (Admin)
 
-curl http://localhost:8080/api/admin/analytics
--H "Authorization: Bearer your_admin_token"
+**Endpoint:** `GET /api/admin/urls`
+
+```
+curl "http://localhost:8080/api/admin/urls?page=1&page_size=20" \
+  -H "Authorization: Bearer your_admin_token"
+```
 
 **Response:**
+```
 {
-"total_urls": 1523,
-"total_clicks": 45230,
-"active_urls": 1500,
-"clicks_today": 892
+  "urls": [...],
+  "total": 1523,
+  "page": 1,
+  "page_size": 20
 }
+```
 
-#### 7. Delete URL (Admin)
-curl -X DELETE http://localhost:8080/api/admin/urls/abc123
--H "Authorization: Bearer your_admin_token"
+> [!IMPORTANT]
+> Requires admin authentication token.
+
+---
+
+### 6. Get Analytics (Admin)
+
+**Endpoint:** `GET /api/admin/analytics`
+
+```
+curl http://localhost:8080/api/admin/analytics \
+  -H "Authorization: Bearer your_admin_token"
+```
+
+**Response:**
+```
+{
+  "total_urls": 1523,
+  "total_clicks": 45230,
+  "active_urls": 1500,
+  "clicks_today": 892
+}
+```
+
+> [!IMPORTANT]
+> Requires admin authentication token.
+
+---
+
+### 7. Delete URL (Admin)
+
+**Endpoint:** `DELETE /api/admin/urls/{short_code}`
+
+```
+curl -X DELETE http://localhost:8080/api/admin/urls/abc123 \
+  -H "Authorization: Bearer your_admin_token"
+```
+
+**Response:**
+```
+{
+  "message": "URL deleted successfully"
+}
+```
+
+> [!IMPORTANT]
+> Requires admin authentication token.
 
 
 ## Performance Characteristics
@@ -131,7 +225,7 @@ curl -X DELETE http://localhost:8080/api/admin/urls/abc123
 - **Cache Hit Rate**: >95% for popular URLs
 - **Database**: Connection pooling (20 base + 40 overflow)
 - **Workers**: 4 Uvicorn workers
-- **Rate Limit**: 100 requests/minute per IP
+- **Rate Limit**: 100 requests/minute per IP (configurable)
 
 ## Design Decisions
 
@@ -145,7 +239,7 @@ Uses Base62 (A-Z, a-z, 0-9) for compact, URL-safe short codes. Combines auto-inc
 - **Performance**: Sub-millisecond lookups
 
 ### 3. Database Design
-- **Indexes**: Hash index on original_url, B-tree on short_code
+- **Indexes**: Hash index on original_url, short_code
 - **Soft Deletes**: URLs marked inactive instead of deletion
 - **Connection Pooling**: asyncpg with 20-60 connections
 
