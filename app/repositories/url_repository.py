@@ -1,3 +1,4 @@
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy import select, update, func, and_
 from datetime import datetime
@@ -30,6 +31,7 @@ class URLRepository:
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all, checkfirst=True)
 
+
     async def get_by_short_code(self, short_code: str) -> Optional[URL]:
         """Retrieve URL by short code"""
         async with self.async_session() as session:
@@ -39,6 +41,7 @@ class URLRepository:
                 )
             )
             return result.scalar_one_or_none()
+
 
     async def get_by_original_url(self, original_url: str) -> Optional[URL]:
         """Check if original URL already exists"""
@@ -50,32 +53,56 @@ class URLRepository:
             )
             return result.scalar_one_or_none()
 
-    async def create_url(self, original_url: str, custom_alias: Optional[str], ip: str) -> URL:
-        """Create new URL mapping"""
-        async with self.async_session() as session:
 
-            short_code= "temp"
+    async def create_url(self, original_url: str, custom_alias: Optional[str], ip: str) -> URL:
+        """Create new URL mapping - raises IntegrityError on conflict"""
+        async with self.async_session() as session:
+            short_code = "temp"
             if custom_alias:
-                short_code=custom_alias
+                short_code = custom_alias
 
             url = URL(
                 short_code=short_code,
                 original_url=original_url,
                 created_by_ip=ip
             )
-            session.add(url)
-            await session.flush()
-            await session.commit()
-            await session.refresh(url)
-            return url
 
-    async def update_short_code(self, xid: int, short_code: str) -> None:
-        """Update short code after ID generation"""
+            try:
+                session.add(url)
+                await session.flush()
+                await session.commit()
+                await session.refresh(url)
+                return url
+            except IntegrityError as e:
+                # Rollback the failed transaction
+                await session.rollback()
+                # Re-raise to be handled by service layer
+                raise e
+
+
+    async def update_short_code(self, url_id: int, short_code: str) -> URL:
+        """Update short_code after generation"""
         async with self.async_session() as session:
-            await session.execute(
-                update(URL).where(URL.id == xid).values(short_code=short_code)
-            )
-            await session.commit()
+            try:
+                # Fetch the URL entry
+                result = await session.execute(
+                    select(URL).where(URL.id == url_id)
+                )
+                url = result.scalar_one_or_none()
+
+                if not url:
+                    raise ValueError(f"URL with id {url_id} not found")
+
+                # Update the short_code
+                url.short_code = short_code
+
+                await session.commit()
+                await session.refresh(url)
+                return url
+            except IntegrityError as e:
+                # If short_code conflicts with existing one
+                await session.rollback()
+                raise e
 
     async def increment_click_count(self, short_code: str) -> None:
         """Increment click count and update last accessed time"""
